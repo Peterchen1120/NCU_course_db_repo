@@ -1,5 +1,6 @@
 from bs4 import BeautifulSoup
 import re
+from collections import OrderedDict
 
 
 
@@ -130,5 +131,50 @@ class CourseProcessor:
                 "schedule": current_schedule, # list[dict] 
                 "relation": relation    # dict
                 }
+
+    def clean_syllabus(self, raw_text_list):
+        if not raw_text_list:
+            return ""
+
+        noise_keywords = ["著作權", "非法影印", "版權所有", "請遵守智慧財產權"]
+        label_keywords = ["課程目標", "授課內容", "評分方式", "教學方式", "參考書目", "課程大綱", "先修課程"]
+        cleaned = []
+
+        for text in raw_text_list:
+            line = re.sub(r"\s+", " ", str(text)).strip()
+            if not line:
+                continue
+            if any(keyword in line for keyword in noise_keywords):
+                continue
+            for keyword in label_keywords:
+                if keyword in line and f"【{keyword}】" not in line:
+                    line = line.replace(keyword, f"【{keyword}】", 1)
+                    break
+            cleaned.append(line)
+
+        deduped = []
+        for line in cleaned:
+            if not deduped or deduped[-1] != line:
+                deduped.append(line)
+        return " | ".join(deduped)
+
+    def format_priority(self, priority_data):
+        if not priority_data:
+            return ""
+
+        grouped = OrderedDict()
+        for rank, description in priority_data:
+            rank_text = str(rank).strip()
+            desc_text = re.sub(r"\s+", " ", str(description)).strip()
+            if not rank_text or not desc_text:
+                continue
+            grouped.setdefault(rank_text, [])
+            if desc_text not in grouped[rank_text]:
+                grouped[rank_text].append(desc_text)
+
+        return " | ".join(
+            f"順位{rank}: ({', '.join(descriptions)})"
+            for rank, descriptions in grouped.items()
+        )
 
     

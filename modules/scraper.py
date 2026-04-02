@@ -120,7 +120,6 @@ class NCUScraper():
         self.back_to_mainPage()
         wait = WebDriverWait(self.driver, 15)
         time.sleep(1)
-
         try:
             dept_link = wait.until(
                 EC.element_to_be_clickable(
@@ -129,7 +128,6 @@ class NCUScraper():
             )
             self.driver.execute_script("arguments[0].click();", dept_link)
             return dept_link
-
         except Exception as e:
             print(f"❌ 發生錯誤: {e}")
             return None
@@ -149,6 +147,78 @@ class NCUScraper():
                     "grade":item["linkText"]
                 })
         return result
+
+    def fetch_detail_text(self, url, mode):
+        if not url:
+            return [] if mode == "syllabus" else []
+
+        self.driver.get(url)
+
+        if mode == "syllabus":
+            candidates = [
+                (By.CSS_SELECTOR, "table tr"),
+                (By.CSS_SELECTOR, "tbody tr"),
+                (By.XPATH, "//tr[td]")
+            ]
+            rows = []
+            for locator in candidates:
+                try:
+                    self.wait.until(EC.presence_of_all_elements_located(locator))
+                    rows = self.driver.find_elements(*locator)
+                    if rows:
+                        break
+                except:
+                    continue
+
+            detail_text = []
+            for row in rows:
+                texts = [td.text.strip() for td in row.find_elements(By.TAG_NAME, "td")]
+                texts = [text for text in texts if text]
+                if not texts:
+                    continue
+                row_text = " ".join(texts)
+                if "著作權" in row_text or "非法影印" in row_text:
+                    continue
+                detail_text.extend(texts)
+            return detail_text
+
+        if mode == "priority":
+            candidates = [
+                (By.CSS_SELECTOR, "table tr"),
+                (By.CSS_SELECTOR, "tbody tr"),
+                (By.XPATH, "//tr[td]")
+            ]
+            rows = []
+            for locator in candidates:
+                try:
+                    self.wait.until(EC.presence_of_all_elements_located(locator))
+                    rows = self.driver.find_elements(*locator)
+                    if rows:
+                        break
+                except:
+                    continue
+
+            priority_data = []
+            for row in rows:
+                cells = row.find_elements(By.TAG_NAME, "td")
+                texts = [cell.text.strip() for cell in cells if cell.text.strip()]
+                if len(texts) < 2:
+                    continue
+                if "序號" in texts[0] and any("條件" in text for text in texts[1:]):
+                    continue
+
+                rank_match = re.search(r"\d+", texts[0])
+                if not rank_match:
+                    continue
+
+                condition = " ".join(texts[1:]).strip()
+                if not condition:
+                    continue
+
+                priority_data.append((int(rank_match.group()), condition))
+            return priority_data
+
+        return []
             
 
     def close(self):
